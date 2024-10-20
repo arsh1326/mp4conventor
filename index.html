@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP3 to MP4 Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg.js/4.2.9001/ffmpeg.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .drop-zone.dragover {
+            background-color: #e1f5fe;
+            border-color: #2196f3;
+        }
+        button {
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+        #progress {
+            margin: 20px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MP3 to MP4 Converter</h1>
+        <div class="drop-zone" id="dropZone">
+            <p>Drop your MP3 file here or click to select</p>
+            <input type="file" id="fileInput" accept=".mp3" style="display: none">
+        </div>
+        <div id="progress">
+            <p>Converting... Please wait.</p>
+            <progress value="0" max="100" id="progressBar"></progress>
+        </div>
+        <button id="convertBtn" disabled>Convert to MP4</button>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const convertBtn = document.getElementById('convertBtn');
+        const progress = document.getElementById('progress');
+        let selectedFile = null;
+
+        // Handle drag and drop events
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file.type === 'audio/mpeg') {
+                handleFile(file);
+            } else {
+                alert('Please select an MP3 file.');
+            }
+        });
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            dropZone.innerHTML = `Selected file: ${file.name}`;
+            convertBtn.disabled = false;
+        }
+
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            progress.style.display = 'block';
+            const progressBar = document.getElementById('progressBar');
+            
+            try {
+                // Create a video element with a placeholder image
+                const canvas = document.createElement('canvas');
+                canvas.width = 640;
+                canvas.height = 360;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Convert the audio to video
+                const ffmpeg = FFmpeg.createWorker();
+                await ffmpeg.load();
+                
+                // Load the audio file
+                const audioData = await selectedFile.arrayBuffer();
+                await ffmpeg.write('audio.mp3', new Uint8Array(audioData));
+                
+                // Convert to MP4
+                await ffmpeg.run('-i audio.mp3 -c:a copy output.mp4');
+                
+                // Get the result
+                const { data } = await ffmpeg.read('output.mp4');
+                
+                // Create download link
+                const blob = new Blob([data.buffer], { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = selectedFile.name.replace('.mp3', '.mp4');
+                a.click();
+                
+                await ffmpeg.terminate();
+                progress.style.display = 'none';
+                alert('Conversion complete! The download should start automatically.');
+            } catch (error) {
+                console.error(error);
+                alert('An error occurred during conversion. Please try again.');
+                progress.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
